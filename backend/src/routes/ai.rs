@@ -17,7 +17,7 @@ pub async fn ask_question(
     }))
 }
 
-fn get_physics_answer(question: &str, context: &Option<String>) -> String {
+fn get_physics_answer(question: &str, _context: &Option<String>) -> String {
     let q = question.to_lowercase();
     
     // Check for common physics questions

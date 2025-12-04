@@ -26,6 +26,12 @@ pub async fn save_progress(
         request.completed
     );
     
+    // Check achievements BEFORE moving request fields
+    let achievements = check_achievements(&request);
+    
+    // Clone parameters before moving
+    let parameters = request.parameters.clone();
+    
     let progress = UserProgress {
         user_id: "demo-user".to_string(),
         completed_simulations: if request.completed {
@@ -42,13 +48,13 @@ pub async fn save_progress(
             Some(CurrentSimulation {
                 simulation_id: request.simulation_id,
                 started_at: Utc::now(),
-                last_parameters: request.parameters,
+                last_parameters: parameters,
             })
         } else {
             None
         },
         total_time_minutes: request.time_spent_minutes,
-        achievements: check_achievements(&request),
+        achievements,
         last_activity: Utc::now(),
     };
     

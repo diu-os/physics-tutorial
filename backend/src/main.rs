@@ -1,9 +1,8 @@
 use axum::{
     routing::{get, post},
-    http::StatusCode,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;

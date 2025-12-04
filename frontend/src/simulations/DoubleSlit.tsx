@@ -10,7 +10,7 @@ interface DoubleSlitProps {
 
 function DoubleSlit({ wavelength, slitSeparation, observerMode }: DoubleSlitProps) {
   const particlesRef = useRef<THREE.Points>(null);
-  const screenRef = useRef<THREE.Mesh>(null);
+  const waveParticlesRef = useRef<THREE.Points>(null);
   const timeRef = useRef(0);
 
   // Convert wavelength to color
@@ -41,24 +41,24 @@ function DoubleSlit({ wavelength, slitSeparation, observerMode }: DoubleSlitProp
 
   const color = wavelengthToColor(wavelength);
 
-  // Generate interference pattern
+  // Generate interference pattern for the screen
   const interferencePattern = useMemo(() => {
-    const numPoints = 200;
+    const numPoints = 100;
     const pattern: number[] = [];
     const wavelengthM = wavelength * 1e-9;
     const slitSepM = slitSeparation * 1e-3;
     
     for (let i = 0; i < numPoints; i++) {
-      const y = (i - numPoints / 2) * 0.02; // -2 to +2 units
-      const theta = Math.atan(y / 3); // screen at z = 3
+      const y = (i - numPoints / 2) * 0.04;
+      const theta = Math.atan(y / 2);
       
       if (observerMode) {
-        // Particle behavior: two bands
-        const band1 = Math.exp(-Math.pow((theta + 0.15), 2) / 0.01);
-        const band2 = Math.exp(-Math.pow((theta - 0.15), 2) / 0.01);
-        pattern.push((band1 + band2) * 0.5);
+        // Particle behavior: two gaussian bands
+        const band1 = Math.exp(-Math.pow((y - slitSeparation * 0.8), 2) / 0.05);
+        const band2 = Math.exp(-Math.pow((y + slitSeparation * 0.8), 2) / 0.05);
+        pattern.push((band1 + band2) * 0.8);
       } else {
-        // Wave behavior: interference
+        // Wave behavior: interference pattern
         const phase = Math.PI * slitSepM * Math.sin(theta) / wavelengthM;
         pattern.push(Math.pow(Math.cos(phase), 2));
       }
@@ -67,212 +67,278 @@ function DoubleSlit({ wavelength, slitSeparation, observerMode }: DoubleSlitProp
     return pattern;
   }, [wavelength, slitSeparation, observerMode]);
 
-  // Generate particles for visualization
-  const particles = useMemo(() => {
-    const count = observerMode ? 500 : 2000;
+  // Wave particles spreading from slits
+  const waveParticles = useMemo(() => {
+    const count = 3000;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const phases = new Float32Array(count);
+    
+    for (let i = 0; i < count; i++) {
+      // Random angle from each slit
+      const fromTopSlit = i % 2 === 0;
+      const slitY = fromTopSlit ? slitSeparation / 2 : -slitSeparation / 2;
+      
+      // Spread angle (-60 to +60 degrees)
+      const angle = (Math.random() - 0.5) * Math.PI * 0.7;
+      
+      // Random distance from slit
+      const distance = Math.random() * 2.5;
+      
+      const x = distance * Math.cos(angle);
+      const y = slitY + distance * Math.sin(angle);
+      
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = 0;
+      
+      // Store phase for animation
+      phases[i] = Math.random() * Math.PI * 2;
+      
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    
+    return { positions, colors, phases };
+  }, [slitSeparation, color]);
+
+  // Animate wave particles
+  useFrame((state, delta) => {
+    timeRef.current += delta;
+    
+    if (waveParticlesRef.current && !observerMode) {
+      const positions = waveParticlesRef.current.geometry.attributes.position.array as Float32Array;
+      const count = positions.length / 3;
+      const speed = 0.8;
+      
+      for (let i = 0; i < count; i++) {
+        const fromTopSlit = i % 2 === 0;
+        const slitY = fromTopSlit ? slitSeparation / 2 : -slitSeparation / 2;
+        
+        // Get current position
+        let x = positions[i * 3];
+        let y = positions[i * 3 + 1];
+        
+        // Calculate distance from origin slit
+        const dx = x;
+        const dy = y - slitY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0.01) {
+          // Move outward from slit
+          const dirX = dx / dist;
+          const dirY = dy / dist;
+          
+          x += dirX * delta * speed;
+          y += dirY * delta * speed;
+          
+          // Reset if too far
+          if (x > 2.3 || Math.abs(y) > 2.5) {
+            const angle = (Math.random() - 0.5) * Math.PI * 0.7;
+            const startDist = 0.05;
+            x = startDist * Math.cos(angle);
+            y = slitY + startDist * Math.sin(angle);
+          }
+          
+          positions[i * 3] = x;
+          positions[i * 3 + 1] = y;
+        }
+      }
+      
+      waveParticlesRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  // Screen hit particles (for observer mode)
+  const screenParticles = useMemo(() => {
+    const count = 500;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     
     for (let i = 0; i < count; i++) {
-      // Random x position at source
-      const x = (Math.random() - 0.5) * 0.1;
-      
-      // Y position based on pattern probability
       const patternIndex = Math.floor(Math.random() * interferencePattern.length);
       const probability = interferencePattern[patternIndex];
       
       if (Math.random() < probability) {
-        const y = (patternIndex - interferencePattern.length / 2) * 0.02;
-        positions[i * 3] = x;
+        const y = (patternIndex - interferencePattern.length / 2) * 0.04;
+        positions[i * 3] = 2.5;
         positions[i * 3 + 1] = y;
-        positions[i * 3 + 2] = Math.random() * 3 - 1.5; // z from -1.5 to 1.5
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 0.1;
         
         colors[i * 3] = color.r;
         colors[i * 3 + 1] = color.g;
         colors[i * 3 + 2] = color.b;
       } else {
-        // Hide non-hitting particles
-        positions[i * 3] = 0;
+        positions[i * 3] = 100;
         positions[i * 3 + 1] = 100;
         positions[i * 3 + 2] = 0;
       }
     }
     
     return { positions, colors };
-  }, [interferencePattern, color, observerMode]);
-
-  // Animate particles
-  useFrame((state, delta) => {
-    timeRef.current += delta;
-    
-    if (particlesRef.current) {
-      const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
-      
-      for (let i = 0; i < positions.length / 3; i++) {
-        // Move particles along z-axis
-        positions[i * 3 + 2] += delta * 0.5;
-        
-        // Reset particles that reach the screen
-        if (positions[i * 3 + 2] > 1.5) {
-          positions[i * 3 + 2] = -1.5;
-        }
-      }
-      
-      particlesRef.current.geometry.attributes.position.needsUpdate = true;
-    }
-  });
+  }, [interferencePattern, color]);
 
   return (
     <group>
-      {/* Source */}
-      <mesh position={[-2, 0, 0]}>
-        <boxGeometry args={[0.1, 0.5, 0.1]} />
-        <meshStandardMaterial color="#4ade80" emissive="#4ade80" emissiveIntensity={0.5} />
+      {/* Source emitter */}
+      <mesh position={[-2.5, 0, 0]}>
+        <boxGeometry args={[0.15, 0.8, 0.3]} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.5} />
       </mesh>
       
-      {/* Barrier with slits */}
+      {/* Light beam from source to barrier */}
+      <mesh position={[-1.25, 0, 0]}>
+        <boxGeometry args={[2.3, 0.05, 0.05]} />
+        <meshBasicMaterial color={color} transparent opacity={0.4} />
+      </mesh>
+      
+      {/* Barrier with two slits */}
       <group position={[0, 0, 0]}>
-        {/* Top barrier */}
-        <mesh position={[0, 1 + slitSeparation / 2, 0]}>
-          <boxGeometry args={[0.05, 2 - slitSeparation, 0.5]} />
-          <meshStandardMaterial color="#374151" />
-        </mesh>
-        {/* Middle barrier */}
-        <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[0.05, slitSeparation * 0.5, 0.5]} />
-          <meshStandardMaterial color="#374151" />
-        </mesh>
-        {/* Bottom barrier */}
-        <mesh position={[0, -1 - slitSeparation / 2, 0]}>
-          <boxGeometry args={[0.05, 2 - slitSeparation, 0.5]} />
+        {/* Top part */}
+        <mesh position={[0, 1.2 + slitSeparation / 2, 0]}>
+          <boxGeometry args={[0.08, 2.4 - slitSeparation, 0.4]} />
           <meshStandardMaterial color="#374151" />
         </mesh>
         
-        {/* Slit indicators */}
-        <mesh position={[0, slitSeparation / 2 + 0.1, 0]}>
-          <ringGeometry args={[0.02, 0.03, 16]} />
-          <meshBasicMaterial color="#60a5fa" side={THREE.DoubleSide} />
+        {/* Middle part (between slits) */}
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[0.08, slitSeparation * 0.6, 0.4]} />
+          <meshStandardMaterial color="#374151" />
         </mesh>
-        <mesh position={[0, -slitSeparation / 2 - 0.1, 0]}>
-          <ringGeometry args={[0.02, 0.03, 16]} />
-          <meshBasicMaterial color="#60a5fa" side={THREE.DoubleSide} />
+        
+        {/* Bottom part */}
+        <mesh position={[0, -1.2 - slitSeparation / 2, 0]}>
+          <boxGeometry args={[0.08, 2.4 - slitSeparation, 0.4]} />
+          <meshStandardMaterial color="#374151" />
         </mesh>
+        
+        {/* Slit glow indicators */}
+        <pointLight position={[0.1, slitSeparation / 2 + slitSeparation * 0.35, 0]} color={color} intensity={0.5} distance={1} />
+        <pointLight position={[0.1, -slitSeparation / 2 - slitSeparation * 0.35, 0]} color={color} intensity={0.5} distance={1} />
       </group>
       
       {/* Detection screen */}
-      <mesh ref={screenRef} position={[2, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[1, 4]} />
-        <meshStandardMaterial color="#1f2937" transparent opacity={0.8} side={THREE.DoubleSide} />
+      <mesh position={[2.5, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <planeGeometry args={[0.6, 4]} />
+        <meshStandardMaterial color="#1e293b" side={THREE.DoubleSide} />
       </mesh>
       
       {/* Interference pattern on screen */}
-      <group position={[2.01, 0, 0]}>
+      <group position={[2.48, 0, 0]}>
         {interferencePattern.map((intensity, i) => (
           <mesh 
             key={i} 
-            position={[0, (i - interferencePattern.length / 2) * 0.02, 0]}
+            position={[0, (i - interferencePattern.length / 2) * 0.04, 0]}
+            rotation={[0, -Math.PI / 2, 0]}
           >
-            <boxGeometry args={[0.01, 0.02, 0.02]} />
+            <planeGeometry args={[0.04, 0.5]} />
             <meshBasicMaterial 
               color={color} 
               transparent 
-              opacity={intensity * 0.8}
+              opacity={intensity * 0.9}
+              side={THREE.DoubleSide}
             />
           </mesh>
         ))}
       </group>
       
-      {/* Particles */}
-      <points ref={particlesRef}>
+      {/* Screen hit particles */}
+      <points>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
-            count={particles.positions.length / 3}
-            array={particles.positions}
+            count={screenParticles.positions.length / 3}
+            array={screenParticles.positions}
             itemSize={3}
           />
           <bufferAttribute
             attach="attributes-color"
-            count={particles.colors.length / 3}
-            array={particles.colors}
+            count={screenParticles.colors.length / 3}
+            array={screenParticles.colors}
             itemSize={3}
           />
         </bufferGeometry>
         <pointsMaterial 
-          size={0.02} 
+          size={0.03} 
           vertexColors 
           transparent 
-          opacity={0.8}
-          blending={THREE.AdditiveBlending}
+          opacity={0.9}
         />
       </points>
       
-      {/* Observer indicator */}
-      {observerMode && (
-        <mesh position={[0, 1.5, 0]}>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshBasicMaterial color="#fbbf24" />
-        </mesh>
-      )}
-      
-      {/* Wave visualization (when not observing) */}
+      {/* Wave particles (only in wave mode) */}
       {!observerMode && (
-        <WaveVisualization 
-          color={color} 
-          wavelength={wavelength} 
-          slitSeparation={slitSeparation} 
-        />
+        <points ref={waveParticlesRef}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={waveParticles.positions.length / 3}
+              array={waveParticles.positions}
+              itemSize={3}
+            />
+            <bufferAttribute
+              attach="attributes-color"
+              count={waveParticles.colors.length / 3}
+              array={waveParticles.colors}
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <pointsMaterial 
+            size={0.015} 
+            vertexColors 
+            transparent 
+            opacity={0.6}
+            blending={THREE.AdditiveBlending}
+          />
+        </points>
       )}
+      
+      {/* Observer eye (when observer mode is on) */}
+      {observerMode && (
+        <group position={[0, 1.8, 0]}>
+          <mesh>
+            <sphereGeometry args={[0.15, 16, 16]} />
+            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.3} />
+          </mesh>
+          {/* Eye pupil */}
+          <mesh position={[0, -0.05, 0.12]}>
+            <sphereGeometry args={[0.05, 8, 8]} />
+            <meshBasicMaterial color="#000" />
+          </mesh>
+          {/* Detection lines */}
+          <line>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                count={2}
+                array={new Float32Array([0, -0.15, 0, 0, -1.8 + slitSeparation/2 + slitSeparation*0.35, 0])}
+                itemSize={3}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color="#fbbf24" transparent opacity={0.3} />
+          </line>
+        </group>
+      )}
+      
+      {/* Labels */}
+      <group>
+        {/* Source label */}
+        <sprite position={[-2.5, 0.7, 0]} scale={[0.8, 0.2, 1]}>
+          <spriteMaterial color="#9ca3af" />
+        </sprite>
+        
+        {/* Slits label */}
+        <sprite position={[0, 2.2, 0]} scale={[0.6, 0.2, 1]}>
+          <spriteMaterial color="#9ca3af" />
+        </sprite>
+        
+        {/* Screen label */}
+        <sprite position={[2.5, 2.2, 0]} scale={[0.6, 0.2, 1]}>
+          <spriteMaterial color="#9ca3af" />
+        </sprite>
+      </group>
     </group>
-  );
-}
-
-// Separate component for wave visualization
-function WaveVisualization({ 
-  color, 
-  wavelength, 
-  slitSeparation 
-}: { 
-  color: THREE.Color; 
-  wavelength: number;
-  slitSeparation: number;
-}) {
-  const waveRef = useRef<THREE.Mesh>(null);
-  
-  useFrame((state) => {
-    if (waveRef.current) {
-      const positions = waveRef.current.geometry.attributes.position.array as Float32Array;
-      const time = state.clock.elapsedTime;
-      
-      for (let i = 0; i < positions.length / 3; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        
-        // Create wave from two slit sources
-        const dist1 = Math.sqrt(Math.pow(x, 2) + Math.pow(y - slitSeparation / 2, 2));
-        const dist2 = Math.sqrt(Math.pow(x, 2) + Math.pow(y + slitSeparation / 2, 2));
-        
-        const wave1 = Math.sin(dist1 * 20 - time * 2);
-        const wave2 = Math.sin(dist2 * 20 - time * 2);
-        
-        positions[i * 3 + 2] = (wave1 + wave2) * 0.05;
-      }
-      
-      waveRef.current.geometry.attributes.position.needsUpdate = true;
-    }
-  });
-  
-  return (
-    <mesh ref={waveRef} position={[1, 0, 0]} rotation={[0, 0, 0]}>
-      <planeGeometry args={[2, 2, 50, 50]} />
-      <meshBasicMaterial 
-        color={color} 
-        wireframe 
-        transparent 
-        opacity={0.3}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
   );
 }
 

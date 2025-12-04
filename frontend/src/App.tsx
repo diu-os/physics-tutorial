@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { Beaker, Brain, Trophy, Menu, X } from 'lucide-react';
+import { Beaker, Brain, Trophy, Menu, X, HelpCircle } from 'lucide-react';
 import DoubleSlit from './simulations/DoubleSlit';
 import SimulationControls from './components/SimulationControls';
 import AIAssistant from './components/AIAssistant';
@@ -13,10 +13,11 @@ function App() {
   const [activeSimulation, setActiveSimulation] = useState<SimulationType>('double-slit');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiOpen, setAiOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   
   // Simulation parameters
   const [wavelength, setWavelength] = useState(550);
-  const [slitSeparation, setSlitSeparation] = useState(0.1);
+  const [slitSeparation, setSlitSeparation] = useState(0.5);
   const [observerMode, setObserverMode] = useState(false);
 
   const simulations = [
@@ -34,7 +35,7 @@ function App() {
           <p className="text-xs text-gray-400 mt-1">Interactive Quantum Tutorial</p>
         </div>
         
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 overflow-y-auto">
           <h2 className="text-xs uppercase text-gray-500 mb-3 font-semibold">Simulations</h2>
           <ul className="space-y-2">
             {simulations.map((sim) => (
@@ -68,9 +69,9 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-14 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4">
+        <header className="h-14 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -86,24 +87,37 @@ function App() {
             </div>
           </div>
           
-          <button
-            onClick={() => setAiOpen(!aiOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
-              ${aiOpen ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
-          >
-            <Brain size={18} />
-            <span className="text-sm">AI Assistant</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              title="Help"
+            >
+              <HelpCircle size={18} />
+            </button>
+            <button
+              onClick={() => setAiOpen(!aiOpen)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
+                ${aiOpen ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+            >
+              <Brain size={18} />
+              <span className="text-sm">AI Assistant</span>
+            </button>
+          </div>
         </header>
 
         {/* Simulation Area */}
-        <div className="flex-1 flex">
+        <div className="flex-1 flex min-h-0">
           {/* 3D Canvas */}
-          <div className="flex-1 relative">
-            <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
-              <color attach="background" args={['#111827']} />
-              <ambientLight intensity={0.5} />
-              <pointLight position={[10, 10, 10]} />
+          <div className="flex-1 relative min-w-0">
+            <Canvas 
+              camera={{ position: [0, 2, 6], fov: 50 }}
+              style={{ touchAction: 'none' }}
+            >
+              <color attach="background" args={['#0f172a']} />
+              <ambientLight intensity={0.4} />
+              <pointLight position={[10, 10, 10]} intensity={0.6} />
+              <pointLight position={[-10, -10, -10]} intensity={0.3} />
               
               {activeSimulation === 'double-slit' && (
                 <DoubleSlit 
@@ -117,11 +131,35 @@ function App() {
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
+                minDistance={2}
+                maxDistance={15}
+                target={[0, 0, 0]}
               />
+              
+              {/* Grid helper for orientation */}
+              <gridHelper args={[10, 10, '#334155', '#1e293b']} position={[0, -2.5, 0]} />
             </Canvas>
             
+            {/* Help overlay */}
+            {showHelp && (
+              <div className="absolute top-4 left-4 bg-gray-800/95 backdrop-blur p-4 rounded-lg text-sm max-w-xs">
+                <h3 className="font-semibold text-blue-400 mb-2">🎮 Controls</h3>
+                <ul className="space-y-1 text-gray-300">
+                  <li>🖱️ <strong>Left click + drag</strong> — Rotate view</li>
+                  <li>🖱️ <strong>Right click + drag</strong> — Pan</li>
+                  <li>🔄 <strong>Scroll wheel</strong> — Zoom in/out</li>
+                </ul>
+                <button 
+                  onClick={() => setShowHelp(false)}
+                  className="mt-3 text-xs text-gray-500 hover:text-gray-300"
+                >
+                  Click to close
+                </button>
+              </div>
+            )}
+            
             {/* Overlay info */}
-            <div className="absolute bottom-4 left-4 bg-gray-800/80 backdrop-blur px-4 py-2 rounded-lg text-sm">
+            <div className="absolute bottom-4 left-4 bg-gray-800/90 backdrop-blur px-4 py-2 rounded-lg text-sm">
               <div className="flex items-center gap-4">
                 <span>λ = {wavelength} nm</span>
                 <span>d = {slitSeparation.toFixed(2)} mm</span>
@@ -129,6 +167,11 @@ function App() {
                   {observerMode ? '👁 Observer ON' : '🌊 Wave mode'}
                 </span>
               </div>
+            </div>
+            
+            {/* Quick tip */}
+            <div className="absolute top-4 right-4 bg-blue-600/20 border border-blue-500/30 px-3 py-2 rounded-lg text-xs text-blue-300">
+              💡 Try toggling Observer Mode to see wave-particle duality!
             </div>
           </div>
 
