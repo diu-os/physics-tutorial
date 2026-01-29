@@ -1,6 +1,6 @@
 // App.tsx - Main Application with All Modes Integration
 /**
- * DIU Physics Interactive v15.4
+ * DIU Physics Interactive v16.0
  * 
  * An open-source educational platform for quantum physics visualization.
  * Built with respect for the scientific community and proper attribution.
@@ -8,17 +8,15 @@
  * "If I have seen further, it is by standing on the shoulders of giants"
  * — Isaac Newton, 1675
  * 
- * We welcome contributions from scientists, educators, and developers!
- * Contact: science@diu-os.dev
- * GitHub: https://github.com/desci-intelligent-universe
+ * Experiments:
+ * - Double-Slit: Wave-particle duality
+ * - Quantum Tunneling: Barrier penetration (Nobel Prize 2025)
+ * - Hydrogen Orbitals: Atomic structure visualization
  * 
  * Modes:
  * - Demo: Simplified for curious minds
  * - Laboratory: Tasks and XP for students
  * - Research: Extended parameters for scientists
- * - Simulation: (Coming soon) Monte Carlo, batch runs
- * - Collaboration: (Coming soon) Shared sessions
- * - Sandbox: (Coming soon) Custom experiments
  */
 
 import { useState, useCallback, useEffect, Suspense, useRef } from 'react';
@@ -26,7 +24,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 
 // Components
-import { ModeSelector, ComingSoonModal, type AppMode } from './components/ModeSelector';
+import { ComingSoonModal, type AppMode } from './components/ModeSelector';
 import { ControlsPanel } from './components/ControlsPanel';
 import { ResearchPanel, DEFAULT_RESEARCH_PARAMS, type ResearchParams } from './components/ResearchPanel';
 import { StatsPanel } from './components/StatsPanel';
@@ -45,15 +43,60 @@ import { FullscreenToggle, FullscreenOverlay, MinimalFullscreenControls } from '
 import DoubleSlit from './simulations/DoubleSlit';
 import type { DoubleSlitParams, DoubleSlitStats } from './simulations/DoubleSlit';
 
+import QuantumTunneling from './simulations/QuantumTunneling';
+import type { TunnelingParams, TunnelingStats } from './simulations/QuantumTunneling';
+import { DEFAULT_TUNNELING_PARAMS } from './simulations/QuantumTunneling';
+
+import HydrogenOrbitals from './simulations/HydrogenOrbitals';
+import type { HydrogenParams, HydrogenStats } from './simulations/HydrogenOrbitals';
+import { DEFAULT_HYDROGEN_PARAMS } from './simulations/HydrogenOrbitals';
+
 // i18n
 import { LanguageProvider, useLanguage, LanguageSwitcher } from './i18n/LanguageContext';
+
+// ============== EXPERIMENT TYPES ==============
+type ExperimentType = 'doubleSlit' | 'tunneling' | 'hydrogen';
+
+interface ExperimentInfo {
+  id: ExperimentType;
+  name: string;
+  nameRu: string;
+  icon: string;
+  color: string;
+  badge?: string;
+}
+
+const EXPERIMENTS: ExperimentInfo[] = [
+  {
+    id: 'doubleSlit',
+    name: 'Double-Slit',
+    nameRu: 'Двойная щель',
+    icon: '🌊',
+    color: '#3b82f6',
+  },
+  {
+    id: 'tunneling',
+    name: 'Quantum Tunneling',
+    nameRu: 'Туннелирование',
+    icon: '⚡',
+    color: '#a855f7',
+    badge: '🏆 Nobel 2025',
+  },
+  {
+    id: 'hydrogen',
+    name: 'Hydrogen Orbitals',
+    nameRu: 'Орбитали H',
+    icon: '⚛️',
+    color: '#f97316',
+  },
+];
 
 // Default parameters for each mode
 const DEFAULT_DEMO_PARAMS: DoubleSlitParams = {
   wavelength: 550,
   slitDistance: 0.3,
   slitWidth: 0.05,
-  barrierThickness: 0.1,  // Default thin barrier
+  barrierThickness: 0.1,
   coherence: 100,
   intensity: 50,
   observerOn: false,
@@ -67,71 +110,741 @@ const DEFAULT_DEMO_PARAMS: DoubleSlitParams = {
 
 const DEFAULT_LAB_PARAMS: DoubleSlitParams = {
   ...DEFAULT_DEMO_PARAMS,
-  barrierThickness: 0.1,  // Explicitly set for Lab mode
+  barrierThickness: 0.1,
   showDiscretePoints: true,
   showTheoryOverlay: false,
 };
 
-// Extended parameters for Research mode
-interface ExtendedParams extends DoubleSlitParams {
-  // Source
-  lineWidth: number;
-  polarization: 'H' | 'V' | '45' | 'circular' | 'unpolarized';
-  sourceType: 'laser' | 'led' | 'thermal' | 'single-photon';
-  photonRate: number;
+// ============== EXPERIMENT SELECTOR COMPONENT (DROPDOWN) ==============
+function ExperimentSelector({
+  current,
+  onChange,
+  language,
+}: {
+  current: ExperimentType;
+  onChange: (exp: ExperimentType) => void;
+  language: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Geometry
-  slitHeight: number;
-  barrierThickness: number;
-  screenDistance: number;
-  incidenceAngle: number;
-  slitCount: number;
+  const currentExp = EXPERIMENTS.find(e => e.id === current)!;
   
-  // Detector
-  detectorType: 'ccd' | 'pmt' | 'spad' | 'emccd';
-  pixelSize: number;
-  quantumEfficiency: number;
-  darkCounts: number;
-  readNoise: number;
-  exposureTime: number;
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
-  // Environment
-  medium: 'vacuum' | 'air' | 'nitrogen' | 'oxygen' | 'helium' | 'argon' | 'co2' | 'water';
-  refractiveIndex: number;
-  temperature: number;
-  pressure: number;
-  humidity: number;
-  
-  // Display
-  screenMode: ScreenMode;
-  heatmapOpacity: number;
-  colorScheme: 'wavelength' | 'thermal' | 'grayscale' | 'scientific';
+  return (
+    <div className="relative z-[100]" ref={dropdownRef}>
+      {/* Main Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/70 hover:bg-slate-700 rounded-lg transition-colors border border-slate-600/50"
+        style={{ borderLeftColor: currentExp.color, borderLeftWidth: '3px' }}
+      >
+        <span>{currentExp.icon}</span>
+        <span className="font-medium">
+          {language === 'ru' ? currentExp.nameRu : currentExp.name}
+        </span>
+        {currentExp.badge && (
+          <span className="text-xs text-yellow-400">🏆</span>
+        )}
+        <svg 
+          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-slate-600/50 rounded-lg shadow-xl z-[200] overflow-hidden">
+          {EXPERIMENTS.map((exp) => (
+            <button
+              key={exp.id}
+              onClick={() => {
+                onChange(exp.id);
+                setIsOpen(false);
+              }}
+              className={`
+                w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                ${current === exp.id 
+                  ? 'bg-slate-700 text-white' 
+                  : 'text-gray-300 hover:bg-slate-700/50 hover:text-white'
+                }
+              `}
+              style={current === exp.id ? { 
+                borderLeft: `3px solid ${exp.color}` 
+              } : { 
+                borderLeft: '3px solid transparent' 
+              }}
+            >
+              <span className="text-lg">{exp.icon}</span>
+              <div className="flex-1">
+                <div className="font-medium">
+                  {language === 'ru' ? exp.nameRu : exp.name}
+                </div>
+                {exp.badge && (
+                  <div className="text-xs text-yellow-400">{exp.badge}</div>
+                )}
+              </div>
+              {current === exp.id && (
+                <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-// Refractive indices for different media at STP (λ ≈ 589 nm)
-const MEDIUM_REFRACTIVE_INDICES: Record<string, number> = {
-  vacuum: 1.0,
-  air: 1.000293,
-  nitrogen: 1.000298,
-  oxygen: 1.000271,
-  helium: 1.000036,
-  argon: 1.000281,
-  hydrogen: 1.000132,
-  co2: 1.000450,
-  water: 1.333,
-};
+// ============== MODE SELECTOR COMPONENT (DROPDOWN) ==============
+interface ModeInfo {
+  id: AppMode;
+  name: string;
+  nameRu: string;
+  icon: string;
+  color: string;
+  description?: string;
+  descriptionRu?: string;
+}
 
+const MODES: ModeInfo[] = [
+  {
+    id: 'demo',
+    name: 'Demo',
+    nameRu: 'Демо',
+    icon: '🎮',
+    color: '#22c55e',
+    description: 'Simplified for curious minds',
+    descriptionRu: 'Упрощённый режим',
+  },
+  {
+    id: 'lab',
+    name: 'Laboratory',
+    nameRu: 'Лаборатория',
+    icon: '🔬',
+    color: '#3b82f6',
+    description: 'Tasks and XP for students',
+    descriptionRu: 'Задания и XP',
+  },
+  {
+    id: 'research',
+    name: 'Research',
+    nameRu: 'Исследование',
+    icon: '🔭',
+    color: '#a855f7',
+    description: 'Extended parameters',
+    descriptionRu: 'Расширенные параметры',
+  },
+  {
+    id: 'simulation',
+    name: 'Simulation',
+    nameRu: 'Симуляция',
+    icon: '🖥️',
+    color: '#f97316',
+    description: 'Coming soon',
+    descriptionRu: 'Скоро',
+  },
+  {
+    id: 'collaboration',
+    name: 'Collaboration',
+    nameRu: 'Совместная',
+    icon: '👥',
+    color: '#06b6d4',
+    description: 'Coming soon',
+    descriptionRu: 'Скоро',
+  },
+  {
+    id: 'sandbox',
+    name: 'Sandbox',
+    nameRu: 'Песочница',
+    icon: '🧪',
+    color: '#eab308',
+    description: 'Coming soon',
+    descriptionRu: 'Скоро',
+  },
+];
+
+function ModeSelectorDropdown({
+  current,
+  onChange,
+  language,
+}: {
+  current: AppMode;
+  onChange: (mode: AppMode) => void;
+  language: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const currentModeInfo = MODES.find(m => m.id === current)!;
+  const availableModes = MODES.filter(m => !['simulation', 'collaboration', 'sandbox'].includes(m.id));
+  const comingSoonModes = MODES.filter(m => ['simulation', 'collaboration', 'sandbox'].includes(m.id));
+  
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  return (
+    <div className="relative z-[100]" ref={dropdownRef}>
+      {/* Main Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/70 hover:bg-slate-700 rounded-lg transition-colors border border-slate-600/50"
+        style={{ borderLeftColor: currentModeInfo.color, borderLeftWidth: '3px' }}
+      >
+        <span>{currentModeInfo.icon}</span>
+        <span className="font-medium">
+          {language === 'ru' ? currentModeInfo.nameRu : currentModeInfo.name}
+        </span>
+        <svg 
+          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-1 w-56 bg-slate-800 border border-slate-600/50 rounded-lg shadow-xl z-[200] overflow-hidden">
+          {/* Available modes */}
+          {availableModes.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => {
+                onChange(mode.id);
+                setIsOpen(false);
+              }}
+              className={`
+                w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                ${current === mode.id 
+                  ? 'bg-slate-700 text-white' 
+                  : 'text-gray-300 hover:bg-slate-700/50 hover:text-white'
+                }
+              `}
+              style={current === mode.id ? { 
+                borderLeft: `3px solid ${mode.color}` 
+              } : { 
+                borderLeft: '3px solid transparent' 
+              }}
+            >
+              <span className="text-lg">{mode.icon}</span>
+              <div className="flex-1">
+                <div className="font-medium">
+                  {language === 'ru' ? mode.nameRu : mode.name}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {language === 'ru' ? mode.descriptionRu : mode.description}
+                </div>
+              </div>
+              {current === mode.id && (
+                <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ))}
+          
+          {/* Divider */}
+          <div className="border-t border-slate-600/50 my-1" />
+          
+          {/* Coming soon modes */}
+          {comingSoonModes.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => {
+                onChange(mode.id);
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-500 hover:bg-slate-700/30"
+              style={{ borderLeft: '3px solid transparent' }}
+            >
+              <span className="text-lg opacity-50">{mode.icon}</span>
+              <div className="flex-1">
+                <div className="font-medium">
+                  {language === 'ru' ? mode.nameRu : mode.name}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {language === 'ru' ? 'Скоро' : 'Coming soon'}
+                </div>
+              </div>
+              <span className="text-xs text-gray-500">🔒</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============== TUNNELING CONTROLS ==============
+function TunnelingControls({
+  params,
+  setParams,
+  onReset,
+}: {
+  params: TunnelingParams;
+  setParams: (p: TunnelingParams) => void;
+  onReset: () => void;
+}) {
+  const { t } = useLanguage();
+  
+  return (
+    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
+          ⚡ Quantum Tunneling
+        </h3>
+        <button
+          onClick={onReset}
+          className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+        >
+          Reset
+        </button>
+      </div>
+      
+      {/* Particle Energy */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Particle Energy (E)</span>
+          <span className="text-green-400">{params.particleEnergy} eV</span>
+        </label>
+        <input
+          type="range"
+          min="0.5"
+          max="20"
+          step="0.5"
+          value={params.particleEnergy}
+          onChange={(e) => setParams({ ...params, particleEnergy: parseFloat(e.target.value) })}
+          className="w-full accent-green-500"
+        />
+      </div>
+      
+      {/* Barrier Height */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Barrier Height (V₀)</span>
+          <span className="text-purple-400">{params.barrierHeight} eV</span>
+        </label>
+        <input
+          type="range"
+          min="1"
+          max="25"
+          step="0.5"
+          value={params.barrierHeight}
+          onChange={(e) => setParams({ ...params, barrierHeight: parseFloat(e.target.value) })}
+          className="w-full accent-purple-500"
+        />
+      </div>
+      
+      {/* Barrier Width */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Barrier Width (L)</span>
+          <span className="text-purple-400">{params.barrierWidth.toFixed(1)} nm</span>
+        </label>
+        <input
+          type="range"
+          min="0.1"
+          max="5"
+          step="0.1"
+          value={params.barrierWidth}
+          onChange={(e) => setParams({ ...params, barrierWidth: parseFloat(e.target.value) })}
+          className="w-full accent-purple-500"
+        />
+      </div>
+      
+      {/* Intensity */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Particle Rate</span>
+          <span className="text-blue-400">{params.intensity}/s</span>
+        </label>
+        <input
+          type="range"
+          min="5"
+          max="100"
+          step="5"
+          value={params.intensity}
+          onChange={(e) => setParams({ ...params, intensity: parseInt(e.target.value) })}
+          className="w-full accent-blue-500"
+        />
+      </div>
+      
+      {/* Toggles */}
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700">
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showWaves ?? true}
+            onChange={(e) => setParams({ ...params, showWaves: e.target.checked })}
+            className="accent-purple-500"
+          />
+          Show Waves
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showTrails ?? true}
+            onChange={(e) => setParams({ ...params, showTrails: e.target.checked })}
+            className="accent-purple-500"
+          />
+          Show Trails
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.slowMotion ?? false}
+            onChange={(e) => setParams({ ...params, slowMotion: e.target.checked })}
+            className="accent-purple-500"
+          />
+          Slow Motion
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showEnergyPlane ?? true}
+            onChange={(e) => setParams({ ...params, showEnergyPlane: e.target.checked })}
+            className="accent-purple-500"
+          />
+          Energy Plane
+        </label>
+      </div>
+      
+      {/* Status */}
+      <div className={`p-2 rounded text-sm text-center ${
+        params.particleEnergy >= params.barrierHeight
+          ? 'bg-green-900/50 text-green-300'
+          : 'bg-purple-900/50 text-purple-300'
+      }`}>
+        {params.particleEnergy >= params.barrierHeight
+          ? '✓ Classical case: E ≥ V₀'
+          : `⚡ Tunneling: E < V₀`
+        }
+      </div>
+    </div>
+  );
+}
+
+// ============== HYDROGEN CONTROLS ==============
+function HydrogenControls({
+  params,
+  setParams,
+  onReset,
+}: {
+  params: HydrogenParams;
+  setParams: (p: HydrogenParams) => void;
+  onReset: () => void;
+}) {
+  const ORBITAL_NAMES = ['s', 'p', 'd', 'f', 'g', 'h', 'i'];
+  const maxL = Math.min(params.n - 1, 6);
+  const maxM = params.l;
+  
+  // Quick presets
+  const presets = [
+    { n: 1, l: 0, m: 0, name: '1s' },
+    { n: 2, l: 0, m: 0, name: '2s' },
+    { n: 2, l: 1, m: 0, name: '2p' },
+    { n: 3, l: 0, m: 0, name: '3s' },
+    { n: 3, l: 1, m: 0, name: '3p' },
+    { n: 3, l: 2, m: 0, name: '3d' },
+    { n: 4, l: 3, m: 0, name: '4f' },
+  ];
+  
+  return (
+    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-orange-400 flex items-center gap-2">
+          ⚛️ Hydrogen Orbitals
+        </h3>
+        <button
+          onClick={onReset}
+          className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+        >
+          Reset
+        </button>
+      </div>
+      
+      {/* Quick Presets */}
+      <div>
+        <label className="text-sm text-gray-400 mb-2 block">Quick Select:</label>
+        <div className="flex flex-wrap gap-1">
+          {presets.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => setParams({ ...params, n: p.n, l: p.l, m: p.m })}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                params.n === p.n && params.l === p.l
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Principal quantum number n */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Principal (n)</span>
+          <span className="text-orange-400">{params.n}</span>
+        </label>
+        <input
+          type="range"
+          min="1"
+          max="7"
+          step="1"
+          value={params.n}
+          onChange={(e) => {
+            const newN = parseInt(e.target.value);
+            const newL = Math.min(params.l, newN - 1);
+            const newM = Math.min(Math.abs(params.m), newL) * Math.sign(params.m || 1);
+            setParams({ ...params, n: newN, l: newL, m: newM });
+          }}
+          className="w-full accent-orange-500"
+        />
+      </div>
+      
+      {/* Angular quantum number l */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Angular (l)</span>
+          <span className="text-orange-400">{params.l} ({ORBITAL_NAMES[params.l] || '?'})</span>
+        </label>
+        <input
+          type="range"
+          min="0"
+          max={maxL}
+          step="1"
+          value={params.l}
+          onChange={(e) => {
+            const newL = parseInt(e.target.value);
+            const newM = Math.min(Math.abs(params.m), newL) * Math.sign(params.m || 1);
+            setParams({ ...params, l: newL, m: newM });
+          }}
+          className="w-full accent-orange-500"
+        />
+      </div>
+      
+      {/* Magnetic quantum number m */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Magnetic (m)</span>
+          <span className="text-orange-400">{params.m}</span>
+        </label>
+        <input
+          type="range"
+          min={-maxM}
+          max={maxM}
+          step="1"
+          value={params.m}
+          onChange={(e) => setParams({ ...params, m: parseInt(e.target.value) })}
+          className="w-full accent-orange-500"
+          disabled={maxM === 0}
+        />
+      </div>
+      
+      {/* Cloud Density */}
+      <div>
+        <label className="flex justify-between text-sm text-gray-300 mb-1">
+          <span>Cloud Density</span>
+          <span className="text-blue-400">{params.cloudDensity}</span>
+        </label>
+        <input
+          type="range"
+          min="500"
+          max="5000"
+          step="250"
+          value={params.cloudDensity ?? 1500}
+          onChange={(e) => setParams({ ...params, cloudDensity: parseInt(e.target.value) })}
+          className="w-full accent-blue-500"
+        />
+      </div>
+      
+      {/* Toggles */}
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700">
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showNucleus ?? true}
+            onChange={(e) => setParams({ ...params, showNucleus: e.target.checked })}
+            className="accent-orange-500"
+          />
+          Nucleus
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showAxes ?? true}
+            onChange={(e) => setParams({ ...params, showAxes: e.target.checked })}
+            className="accent-orange-500"
+          />
+          Axes
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showProbabilityCloud ?? true}
+            onChange={(e) => setParams({ ...params, showProbabilityCloud: e.target.checked })}
+            className="accent-orange-500"
+          />
+          Cloud
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={params.showOrbitalSurface ?? true}
+            onChange={(e) => setParams({ ...params, showOrbitalSurface: e.target.checked })}
+            className="accent-orange-500"
+          />
+          Surface
+        </label>
+      </div>
+      
+      {/* Orbital Info */}
+      <div className="bg-slate-900/50 p-2 rounded text-sm">
+        <div className="text-orange-400 font-semibold">
+          {params.n}{ORBITAL_NAMES[params.l] || '?'} orbital
+        </div>
+        <div className="text-gray-400 text-xs">
+          E = {(-13.6 / (params.n * params.n)).toFixed(2)} eV
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============== TUNNELING STATS PANEL ==============
+function TunnelingStatsPanel({ stats }: { stats: TunnelingStats | null }) {
+  if (!stats) return null;
+  
+  return (
+    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
+      <h3 className="text-lg font-semibold text-purple-400">📊 Statistics</h3>
+      
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="bg-slate-900/50 p-2 rounded">
+          <div className="text-gray-400">Total</div>
+          <div className="text-xl font-bold text-white">{stats.totalParticles}</div>
+        </div>
+        <div className="bg-slate-900/50 p-2 rounded">
+          <div className="text-gray-400">Tunneled</div>
+          <div className="text-xl font-bold text-green-400">{stats.tunneled}</div>
+        </div>
+        <div className="bg-slate-900/50 p-2 rounded">
+          <div className="text-gray-400">Reflected</div>
+          <div className="text-xl font-bold text-red-400">{stats.reflected}</div>
+        </div>
+        <div className="bg-slate-900/50 p-2 rounded">
+          <div className="text-gray-400">T (exp)</div>
+          <div className="text-xl font-bold text-purple-400">
+            {(stats.experimentalProbability * 100).toFixed(1)}%
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-purple-900/30 p-2 rounded text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-400">T (theory):</span>
+          <span className="text-purple-300">{(stats.tunnelingProbability * 100).toFixed(1)}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============== HYDROGEN STATS PANEL ==============
+function HydrogenStatsPanel({ stats }: { stats: HydrogenStats | null }) {
+  if (!stats) return null;
+  
+  return (
+    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
+      <h3 className="text-lg font-semibold text-orange-400">📊 Orbital Info</h3>
+      
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-400">Orbital:</span>
+          <span className="text-orange-400 font-bold">{stats.orbitalName}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Energy:</span>
+          <span className="text-white">{stats.energy.toFixed(2)} eV</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Angular momentum:</span>
+          <span className="text-white">{stats.angularMomentum.toFixed(2)} ℏ</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Avg radius:</span>
+          <span className="text-white">{stats.averageRadius.toFixed(1)} a₀</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Nodes:</span>
+          <span className="text-white">{stats.totalNodes} (r:{stats.radialNodes}, θ:{stats.angularNodes})</span>
+        </div>
+      </div>
+      
+      <div className="bg-orange-900/30 p-2 rounded text-sm">
+        <div className="text-gray-400 mb-1">Explored orbitals:</div>
+        <div className="flex flex-wrap gap-1">
+          {stats.viewedOrbitals.map(o => (
+            <span key={o} className="px-1.5 py-0.5 bg-orange-800/50 rounded text-orange-300 text-xs">
+              {o}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============== MAIN APP CONTENT ==============
 function AppContent() {
   const { t, language } = useLanguage();
   
   // App state
   const [currentMode, setCurrentMode] = useState<AppMode>('demo');
+  const [currentExperiment, setCurrentExperiment] = useState<ExperimentType>('doubleSlit');
   const [showComingSoon, setShowComingSoon] = useState<AppMode | null>(null);
   
-  // Parameters state
+  // Double-Slit parameters
   const [params, setParams] = useState<DoubleSlitParams>(DEFAULT_DEMO_PARAMS);
   const [researchParams, setResearchParams] = useState<ResearchParams>(DEFAULT_RESEARCH_PARAMS);
   const [stats, setStats] = useState<DoubleSlitStats | null>(null);
+  
+  // Tunneling parameters
+  const [tunnelingParams, setTunnelingParams] = useState<TunnelingParams>(DEFAULT_TUNNELING_PARAMS);
+  const [tunnelingStats, setTunnelingStats] = useState<TunnelingStats | null>(null);
+  
+  // Hydrogen parameters
+  const [hydrogenParams, setHydrogenParams] = useState<HydrogenParams>(DEFAULT_HYDROGEN_PARAMS);
+  const [hydrogenStats, setHydrogenStats] = useState<HydrogenStats | null>(null);
   
   // Display state
   const [screenMode, setScreenMode] = useState<ScreenMode>('points');
@@ -143,10 +856,13 @@ function AppContent() {
   // Refs
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   
-  // Camera state - increased zoom range
-  const [cameraDistance, setCameraDistance] = useState(20);
-  const MIN_CAMERA_DISTANCE = 2;  // Even closer zoom for detail!
+  // Camera state
+  const [cameraDistance] = useState(20);
+  const MIN_CAMERA_DISTANCE = 2;
   const MAX_CAMERA_DISTANCE = 60;
+  
+  // Reset counter
+  const [resetKey, setResetKey] = useState(0);
   
   // Handle mode change
   const handleModeChange = useCallback((mode: AppMode) => {
@@ -157,7 +873,6 @@ function AppContent() {
     
     setCurrentMode(mode);
     
-    // Update default params based on mode
     switch (mode) {
       case 'demo':
         setParams(DEFAULT_DEMO_PARAMS);
@@ -166,7 +881,6 @@ function AppContent() {
         setParams(DEFAULT_LAB_PARAMS);
         break;
       case 'research':
-        // Use research params
         setParams({
           ...DEFAULT_LAB_PARAMS,
           wavelength: researchParams.source.wavelength,
@@ -182,9 +896,9 @@ function AppContent() {
     }
   }, [researchParams]);
   
-  // Sync research params to main params
+  // Sync research params
   useEffect(() => {
-    if (currentMode === 'research') {
+    if (currentMode === 'research' && currentExperiment === 'doubleSlit') {
       setParams(prev => ({
         ...prev,
         wavelength: researchParams.source.wavelength,
@@ -194,34 +908,64 @@ function AppContent() {
         intensity: researchParams.source.intensity,
       }));
     }
-  }, [currentMode, researchParams]);
+  }, [currentMode, currentExperiment, researchParams]);
   
-  // Reset counter to force re-mount of simulation
-  const [resetKey, setResetKey] = useState(0);
-  
-  // Reset handler - resets params and forces simulation re-mount
+  // Reset handler
   const handleReset = useCallback(() => {
-    switch (currentMode) {
-      case 'demo':
-        setParams(DEFAULT_DEMO_PARAMS);
+    switch (currentExperiment) {
+      case 'doubleSlit':
+        switch (currentMode) {
+          case 'demo':
+            setParams(DEFAULT_DEMO_PARAMS);
+            break;
+          case 'lab':
+            setParams(DEFAULT_LAB_PARAMS);
+            break;
+          case 'research':
+            setResearchParams(DEFAULT_RESEARCH_PARAMS);
+            break;
+        }
         break;
-      case 'lab':
-        setParams(DEFAULT_LAB_PARAMS);
+      case 'tunneling':
+        setTunnelingParams(DEFAULT_TUNNELING_PARAMS);
         break;
-      case 'research':
-        setResearchParams(DEFAULT_RESEARCH_PARAMS);
+      case 'hydrogen':
+        setHydrogenParams(DEFAULT_HYDROGEN_PARAMS);
         break;
     }
-    // Increment key to force simulation reset
     setResetKey(prev => prev + 1);
-  }, [currentMode]);
+  }, [currentMode, currentExperiment]);
   
   // Export handler
   const handleExport = useCallback(() => {
+    let exportData;
+    switch (currentExperiment) {
+      case 'doubleSlit':
+        exportData = {
+          experiment: 'doubleSlit',
+          mode: currentMode,
+          params: currentMode === 'research' ? researchParams : params,
+          stats,
+        };
+        break;
+      case 'tunneling':
+        exportData = {
+          experiment: 'tunneling',
+          params: tunnelingParams,
+          stats: tunnelingStats,
+        };
+        break;
+      case 'hydrogen':
+        exportData = {
+          experiment: 'hydrogen',
+          params: hydrogenParams,
+          stats: hydrogenStats,
+        };
+        break;
+    }
+    
     const data = {
-      mode: currentMode,
-      params: currentMode === 'research' ? researchParams : params,
-      stats,
+      ...exportData,
       timestamp: new Date().toISOString(),
     };
     
@@ -229,106 +973,124 @@ function AppContent() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `diu-experiment-${Date.now()}.json`;
+    a.download = `diu-${currentExperiment}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [currentMode, params, researchParams, stats]);
-  
+  }, [currentExperiment, currentMode, params, researchParams, stats, tunnelingParams, tunnelingStats, hydrogenParams, hydrogenStats]);
+
+  // Get current experiment info
+  const currentExpInfo = EXPERIMENTS.find(e => e.id === currentExperiment)!;
+
   return (
-    <div className="h-screen w-screen bg-slate-950 flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
       {/* Header */}
-      <header className="flex-none px-4 py-2 bg-slate-900/80 backdrop-blur border-b border-slate-800 flex items-center justify-between z-20">
+      <header className="flex-none h-14 border-b border-slate-700/50 flex items-center justify-between px-4 bg-slate-900/80 backdrop-blur z-[100]">
         <div className="flex items-center gap-4">
-          {/* Mode Selector */}
-          <ModeSelector 
-            currentMode={currentMode} 
-            onModeChange={handleModeChange}
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-orange-400 bg-clip-text text-transparent">
+            DIU Physics
+          </h1>
+          
+          {/* Experiment Selector */}
+          <ExperimentSelector
+            current={currentExperiment}
+            onChange={setCurrentExperiment}
+            language={language}
           />
         </div>
         
-        {/* Title */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
-          <span className="text-3xl">🔬</span>
-          <div>
-            <h1 className="text-xl font-bold text-white">{t('title')}</h1>
-            <p className="text-xs text-gray-400">{t('subtitle')} • DIU Platform</p>
-          </div>
-        </div>
-        
-        {/* Right controls */}
-        <div className="flex items-center gap-2">
-          {/* Scientific Credits */}
+        <div className="flex items-center gap-3">
+          {/* Mode Selector (only for Double-Slit) */}
+          {currentExperiment === 'doubleSlit' && (
+            <ModeSelectorDropdown 
+              current={currentMode} 
+              onChange={handleModeChange}
+              language={language}
+            />
+          )}
+          
           <CreditsButton onClick={() => setShowCredits(true)} />
           
-          {/* Mode Info Button */}
           <button
             onClick={() => setShowModeInfo(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-gray-300 transition-colors"
+            className="px-2 py-1 text-sm bg-slate-700/50 hover:bg-slate-600 rounded-md transition-colors"
           >
-            ℹ️ {t('common.modeInfo') || 'Mode Info'}
+            ℹ️ {t('common.modeInfo') || 'Info'}
           </button>
           
-          {/* Language Switcher - All 8 languages */}
           <LanguageSwitcher />
         </div>
       </header>
       
-      {/* Main Content - Hide sidebars in fullscreen */}
+      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Controls (hidden in fullscreen) */}
+        {/* Left Panel - Controls */}
         {!isFullscreen && (
         <aside className="flex-none w-80 p-3 overflow-y-auto space-y-3 bg-slate-900/50">
-          {/* Mode-specific Controls */}
-          {currentMode === 'research' ? (
-            <ResearchPanel
-              params={researchParams}
-              onParamsChange={setResearchParams}
-              onExport={handleExport}
-              onImport={setResearchParams}
-            />
-          ) : (
-            <ControlsPanel
-              params={params}
-              setParams={setParams}
+          {/* Experiment-specific Controls */}
+          {currentExperiment === 'doubleSlit' && (
+            <>
+              {currentMode === 'research' ? (
+                <ResearchPanel
+                  params={researchParams}
+                  onParamsChange={setResearchParams}
+                  onExport={handleExport}
+                  onImport={setResearchParams}
+                />
+              ) : (
+                <ControlsPanel
+                  params={params}
+                  setParams={setParams}
+                  onReset={handleReset}
+                  isLabMode={currentMode === 'lab'}
+                />
+              )}
+              
+              {currentMode !== 'demo' && (
+                <ScreenDisplayMode
+                  mode={screenMode}
+                  onModeChange={setScreenMode}
+                  showHeatmap={params.showHeatmap ?? true}
+                  onHeatmapChange={(show) => setParams(p => ({ ...p, showHeatmap: show }))}
+                  heatmapOpacity={heatmapOpacity}
+                  onOpacityChange={setHeatmapOpacity}
+                />
+              )}
+              
+              {currentMode === 'research' && (
+                <HeatmapSettings
+                  opacity={heatmapOpacity}
+                  onOpacityChange={setHeatmapOpacity}
+                  colorScheme={researchParams.display.colorScheme as 'wavelength' | 'thermal' | 'grayscale' | 'scientific'}
+                  onColorSchemeChange={(scheme) => setResearchParams(p => ({
+                    ...p,
+                    display: { ...p.display, colorScheme: scheme }
+                  }))}
+                  showContours={false}
+                  onShowContoursChange={() => {}}
+                  interpolation="linear"
+                  onInterpolationChange={() => {}}
+                />
+              )}
+              
+              {currentMode === 'lab' && (
+                <LabTasks params={params} stats={stats} />
+              )}
+            </>
+          )}
+          
+          {currentExperiment === 'tunneling' && (
+            <TunnelingControls
+              params={tunnelingParams}
+              setParams={setTunnelingParams}
               onReset={handleReset}
-              isLabMode={currentMode === 'lab'}
             />
           )}
           
-          {/* Screen Display Mode */}
-          {currentMode !== 'demo' && (
-            <ScreenDisplayMode
-              mode={screenMode}
-              onModeChange={setScreenMode}
-              showHeatmap={params.showHeatmap ?? true}
-              onHeatmapChange={(show) => setParams(p => ({ ...p, showHeatmap: show }))}
-              heatmapOpacity={heatmapOpacity}
-              onOpacityChange={setHeatmapOpacity}
-            />
-          )}
-          
-          {/* Heatmap Settings (Research mode only) */}
-          {currentMode === 'research' && (
-            <HeatmapSettings
-              opacity={heatmapOpacity}
-              onOpacityChange={setHeatmapOpacity}
-              colorScheme={researchParams.display.colorScheme}
-              onColorSchemeChange={(scheme) => setResearchParams(p => ({
-                ...p,
-                display: { ...p.display, colorScheme: scheme }
-              }))}
-              showContours={false}
-              onShowContoursChange={() => {}}
-              interpolation="linear"
-              onInterpolationChange={() => {}}
-            />
-          )}
-          
-          {/* Lab Tasks (Lab mode only) */}
-          {currentMode === 'lab' && (
-            <LabTasks
-              params={params}
-              stats={stats}
+          {currentExperiment === 'hydrogen' && (
+            <HydrogenControls
+              params={hydrogenParams}
+              setParams={setHydrogenParams}
+              onReset={handleReset}
             />
           )}
         </aside>
@@ -344,24 +1106,26 @@ function AppContent() {
             />
           </div>
           
-          {/* Fullscreen Overlay */}
-          <FullscreenOverlay
-            isFullscreen={isFullscreen}
-            onExit={() => {
-              if (document.exitFullscreen) {
-                document.exitFullscreen();
-              }
-            }}
-          >
-            <MinimalFullscreenControls
-              wavelength={params.wavelength}
-              slitDistance={params.slitDistance}
-              intensity={params.intensity}
-              observerOn={params.observerOn}
-              totalParticles={stats?.totalParticles ?? 0}
-              fringeCount={stats?.fringeCount ?? 0}
-            />
-          </FullscreenOverlay>
+          {/* Fullscreen Overlay (Double-Slit only) */}
+          {currentExperiment === 'doubleSlit' && (
+            <FullscreenOverlay
+              isFullscreen={isFullscreen}
+              onExit={() => {
+                if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                }
+              }}
+            >
+              <MinimalFullscreenControls
+                wavelength={params.wavelength}
+                slitDistance={params.slitDistance}
+                intensity={params.intensity}
+                observerOn={params.observerOn}
+                totalParticles={stats?.totalParticles ?? 0}
+                fringeCount={stats?.fringeCount ?? 0}
+              />
+            </FullscreenOverlay>
+          )}
           
           <Canvas shadows>
             <PerspectiveCamera
@@ -377,88 +1141,182 @@ function AppContent() {
               dampingFactor={0.05}
             />
             <Suspense fallback={null}>
-              <DoubleSlit
-                key={resetKey}
-                params={{
-                  ...params,
-                  showDiscretePoints: screenMode === 'points' || screenMode === 'hybrid',
-                  showHeatmap: screenMode === 'fringes' || screenMode === 'hybrid' || params.showHeatmap,
-                }}
-                onStatsUpdate={setStats}
-              />
+              {/* Double-Slit Experiment */}
+              {currentExperiment === 'doubleSlit' && (
+                <DoubleSlit
+                  key={`doubleSlit-${resetKey}`}
+                  params={{
+                    ...params,
+                    showDiscretePoints: screenMode === 'points' || screenMode === 'hybrid',
+                    showHeatmap: screenMode === 'fringes' || screenMode === 'hybrid' || params.showHeatmap,
+                  }}
+                  onStatsUpdate={setStats}
+                />
+              )}
+              
+              {/* Quantum Tunneling */}
+              {currentExperiment === 'tunneling' && (
+                <QuantumTunneling
+                  key={`tunneling-${resetKey}`}
+                  params={tunnelingParams}
+                  onStatsUpdate={setTunnelingStats}
+                />
+              )}
+              
+              {/* Hydrogen Orbitals */}
+              {currentExperiment === 'hydrogen' && (
+                <HydrogenOrbitals
+                  key={`hydrogen-${resetKey}`}
+                  params={hydrogenParams}
+                  onStatsUpdate={setHydrogenStats}
+                />
+              )}
             </Suspense>
           </Canvas>
           
           {/* Overlay Info */}
           <div className="absolute bottom-4 left-4 flex items-center gap-4 text-sm">
-            <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{
-                  backgroundColor: `hsl(${(params.wavelength - 380) / (780 - 380) * 270}, 100%, 50%)`,
-                }}
-              />
-              <span className="text-white font-mono">{params.wavelength} nm</span>
+            <div 
+              className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg flex items-center gap-2"
+              style={{ borderLeft: `3px solid ${currentExpInfo.color}` }}
+            >
+              <span>{currentExpInfo.icon}</span>
+              <span className="text-white font-medium">
+                {language === 'ru' ? currentExpInfo.nameRu : currentExpInfo.name}
+              </span>
             </div>
-            <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg text-gray-300">
-              d={params.slitDistance.toFixed(2)} mm
-            </div>
-            <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg text-gray-300">
-              I={params.intensity}
-            </div>
-            {params.observerOn && (
-              <div className="px-3 py-1.5 bg-red-600/80 backdrop-blur rounded-lg text-white flex items-center gap-1">
-                👁️ {t('controls.detectorOn')}
+            
+            {currentExperiment === 'doubleSlit' && (
+              <>
+                <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      backgroundColor: `hsl(${(params.wavelength - 380) / (780 - 380) * 270}, 100%, 50%)`,
+                    }}
+                  />
+                  <span className="text-white font-mono">{params.wavelength} nm</span>
+                </div>
+                {params.observerOn && (
+                  <div className="px-3 py-1.5 bg-red-600/80 backdrop-blur rounded-lg text-white flex items-center gap-1">
+                    👁️ {t('controls.detectorOn')}
+                  </div>
+                )}
+              </>
+            )}
+            
+            {currentExperiment === 'tunneling' && tunnelingStats && (
+              <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg text-purple-300">
+                T = {(tunnelingStats.experimentalProbability * 100).toFixed(1)}%
+              </div>
+            )}
+            
+            {currentExperiment === 'hydrogen' && hydrogenStats && (
+              <div className="px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg text-orange-300">
+                {hydrogenStats.orbitalName} | E = {hydrogenStats.energy.toFixed(2)} eV
               </div>
             )}
           </div>
-          
-          {/* Zoom indicator */}
-          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-slate-900/80 backdrop-blur rounded-lg text-gray-400 text-xs">
-            🔍 Zoom: {Math.round((MAX_CAMERA_DISTANCE - cameraDistance) / (MAX_CAMERA_DISTANCE - MIN_CAMERA_DISTANCE) * 100)}%
-          </div>
         </div>
         
-        {/* Right Panel - Stats & Theory (hidden in fullscreen) */}
+        {/* Right Panel - Stats & Theory */}
         {!isFullscreen && (
         <aside className="flex-none w-80 p-3 overflow-y-auto space-y-3 bg-slate-900/50">
-          {/* Statistics */}
-          <StatsPanel
-            stats={stats}
-            observerOn={params.observerOn}
-            mode={currentMode}
-          />
-          
-          {/* Theory Comparison (Research mode) */}
-          {currentMode === 'research' && stats && researchParams.display.showTheoryCurve && (
-            <TheoryComparisonOverlay
-              histogram={stats.histogram}
-              theoreticalCurve={stats.theoreticalCurve}
-              wavelength={params.wavelength}
-              slitDistance={params.slitDistance}
-              slitWidth={params.slitWidth}
-              coherence={params.coherence ?? 100}
-              observerOn={params.observerOn}
-              showTheory={true}
-              showExperimental={true}
-            />
+          {/* Experiment-specific Stats */}
+          {currentExperiment === 'doubleSlit' && (
+            <>
+              <StatsPanel
+                stats={stats}
+                observerOn={params.observerOn}
+                mode={currentMode}
+              />
+              
+              {currentMode === 'research' && stats && researchParams.display.showTheoryCurve && (
+                <TheoryComparisonOverlay
+                  histogram={stats.histogram}
+                  theoreticalCurve={stats.theoreticalCurve}
+                  wavelength={params.wavelength}
+                  slitDistance={params.slitDistance}
+                  slitWidth={params.slitWidth}
+                  coherence={params.coherence ?? 100}
+                  observerOn={params.observerOn}
+                  showTheory={true}
+                  showExperimental={true}
+                />
+              )}
+              
+              <TheorySection />
+              
+              {(currentMode === 'demo' || currentMode === 'lab') && (
+                <QuizPanel />
+              )}
+              
+              {(currentMode === 'lab' || currentMode === 'research') && stats && (
+                <DataExport
+                  stats={stats}
+                  params={params}
+                  onExport={handleExport}
+                />
+              )}
+            </>
           )}
           
-          {/* Theory Section */}
-          <TheorySection experiment="doubleSlit" />
-          
-          {/* Quiz (Demo and Lab modes) */}
-          {(currentMode === 'demo' || currentMode === 'lab') && (
-            <QuizPanel />
+          {currentExperiment === 'tunneling' && (
+            <>
+              <TunnelingStatsPanel stats={tunnelingStats} />
+              
+              {/* Theory for Tunneling */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
+                <h3 className="text-lg font-semibold text-purple-400">📖 Theory</h3>
+                <div className="text-sm text-gray-300 space-y-2">
+                  <p>
+                    <strong>WKB Approximation:</strong>
+                  </p>
+                  <div className="bg-slate-900/50 p-2 rounded font-mono text-xs">
+                    T ≈ exp(-2κL)
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    where κ = √(2m(V₀-E))/ℏ
+                  </p>
+                  <div className="pt-2 border-t border-slate-700">
+                    <div className="text-yellow-400 text-xs">
+                      🏆 Nobel Prize 2025
+                    </div>
+                    <div className="text-gray-400 text-xs">
+                      Clarke, Devoret, Martinis<br/>
+                      "Macroscopic Quantum Tunneling"
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
           
-          {/* Data Export (Lab and Research modes) */}
-          {(currentMode === 'lab' || currentMode === 'research') && (
-            <DataExport
-              stats={stats}
-              params={params}
-              onExport={handleExport}
-            />
+          {currentExperiment === 'hydrogen' && (
+            <>
+              <HydrogenStatsPanel stats={hydrogenStats} />
+              
+              {/* Theory for Hydrogen */}
+              <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
+                <h3 className="text-lg font-semibold text-orange-400">📖 Theory</h3>
+                <div className="text-sm text-gray-300 space-y-2">
+                  <p>
+                    <strong>Rydberg Formula:</strong>
+                  </p>
+                  <div className="bg-slate-900/50 p-2 rounded font-mono text-xs">
+                    E = -13.6 eV / n²
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Quantum numbers: n, l, m
+                  </p>
+                  <ul className="text-xs text-gray-400 list-disc list-inside">
+                    <li>n = 1,2,3... (principal)</li>
+                    <li>l = 0 to n-1 (angular)</li>
+                    <li>m = -l to +l (magnetic)</li>
+                  </ul>
+                </div>
+              </div>
+            </>
           )}
         </aside>
         )}
