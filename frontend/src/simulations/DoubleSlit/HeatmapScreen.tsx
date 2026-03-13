@@ -1,6 +1,10 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+
+export interface HeatmapScreenHandle {
+  addDetectionPoint: (z: number) => void;
+}
 
 interface DetectionPoint {
   position: THREE.Vector3;
@@ -31,16 +35,16 @@ interface HeatmapScreenProps {
  * - Discrete detection points (individual photon arrivals)
  * - Point accumulation over time
  */
-export function HeatmapScreen({ 
-  position, 
-  histogram, 
+export const HeatmapScreen = forwardRef<HeatmapScreenHandle, HeatmapScreenProps>(function HeatmapScreen({
+  position,
+  histogram,
   wavelength,
   slitDistance = 0.3,
   slitWidth = 0.05,
   observerOn,
   showHeatmap,
   showDiscretePoints = true,
-}: HeatmapScreenProps) {
+}, ref) {
   const textureRef = useRef<THREE.DataTexture | null>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -149,13 +153,8 @@ export function HeatmapScreen({
     }
   }, [wavelength, observerOn, showDiscretePoints, position, getWavelengthColor, screenHeight]);
 
-  // Expose addDetectionPoint for external use
-  useEffect(() => {
-    (window as any).__diuAddDetectionPoint = addDetectionPoint;
-    return () => {
-      delete (window as any).__diuAddDetectionPoint;
-    };
-  }, [addDetectionPoint]);
+  // Expose addDetectionPoint via ref
+  useImperativeHandle(ref, () => ({ addDetectionPoint }), [addDetectionPoint]);
 
   // Update texture and points every frame
   useFrame((_, delta) => {
@@ -286,4 +285,4 @@ export function HeatmapScreen({
       </mesh>
     </group>
   );
-}
+});

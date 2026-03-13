@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Grid } from '@react-three/drei';
 import { Source } from './Source';
 import { Barrier } from './Barrier';
-import { HeatmapScreen } from './HeatmapScreen';
+import { HeatmapScreen, HeatmapScreenHandle } from './HeatmapScreen';
 import { Detector } from './Detector';
 import { Particles } from './Particles';
 import { LightBeam } from './LightBeam';
@@ -105,7 +105,8 @@ export function DoubleSlit({ params, onStatsUpdate }: DoubleSlitProps) {
   } = params;
   
   const [stats, setStats] = useState<DoubleSlitStats>(createEmptyStats);
-  
+  const heatmapRef = useRef<HeatmapScreenHandle>(null);
+
   // Use the improved interference hook with barrier thickness
   const {
     getTheoreticalCurve,
@@ -177,9 +178,7 @@ export function DoubleSlit({ params, onStatsUpdate }: DoubleSlitProps) {
 
   // Handle discrete detection flash
   const handleDetectionFlash = useCallback((z: number) => {
-    if ((window as any).__diuAddDetectionPoint) {
-      (window as any).__diuAddDetectionPoint(z);
-    }
+    heatmapRef.current?.addDetectionPoint(z);
   }, []);
 
   useEffect(() => {
@@ -238,6 +237,7 @@ export function DoubleSlit({ params, onStatsUpdate }: DoubleSlitProps) {
 
       {/* Screen with heatmap and discrete points */}
       <HeatmapScreen
+        ref={heatmapRef}
         position={[SCREEN_X, 2, 0]}
         histogram={stats.histogram}
         wavelength={wavelength}
