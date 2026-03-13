@@ -261,7 +261,7 @@ interface MinimalFullscreenControlsProps {
 export function MinimalFullscreenControls({
   wavelength,
   slitDistance,
-  intensity,
+  intensity: _intensity,
   observerOn,
   totalParticles,
   fringeCount,

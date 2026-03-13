@@ -107,8 +107,7 @@ export function DoubleSlit({ params, onStatsUpdate }: DoubleSlitProps) {
   const [stats, setStats] = useState<DoubleSlitStats>(createEmptyStats);
   
   // Use the improved interference hook with barrier thickness
-  const { 
-    getInterferencePosition, 
+  const {
     getTheoreticalCurve,
     getExpectedFringes,
   } = useInterference(wavelength, slitDistance, slitWidth, coherence, 2.0, 8, barrierThickness);

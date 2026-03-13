@@ -1,7 +1,7 @@
 // components/ExperimentGuide.tsx
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
-import { ChevronDown, ChevronUp, Lightbulb, Target, AlertCircle, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, AlertCircle, Sparkles } from 'lucide-react';
 import type { DoubleSlitStats, DoubleSlitParams } from '../simulations/DoubleSlit';
 
 interface ExperimentGuideProps {

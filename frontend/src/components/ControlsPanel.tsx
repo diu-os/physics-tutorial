@@ -106,6 +106,14 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
     if (typeof setParams === 'function') setParams((prev: DoubleSlitParams) => ({ ...prev, [key]: value }));
   };
 
+  // Draft state: sliders update visuals immediately, physics updates only on pointer/key up
+  const [drafts, setDrafts] = useState({ wavelength, slitDistance, slitWidth, barrierThickness, transmissionEfficiency, coherence, intensity });
+  useEffect(() => {
+    setDrafts({ wavelength, slitDistance, slitWidth, barrierThickness, transmissionEfficiency, coherence, intensity });
+  }, [wavelength, slitDistance, slitWidth, barrierThickness, transmissionEfficiency, coherence, intensity]);
+  const setDraft = (key: keyof typeof drafts, value: number) => setDrafts(prev => ({ ...prev, [key]: value }));
+  const commitDraft = (key: keyof typeof drafts) => up(key as keyof DoubleSlitParams, drafts[key] as DoubleSlitParams[keyof DoubleSlitParams]);
+
   const cls = isLabMode ? "bg-slate-900/95 backdrop-blur-md rounded-xl p-4 space-y-4 shadow-lg border border-emerald-500/30"
     : "bg-indigo-900/60 backdrop-blur-md rounded-xl p-4 space-y-4 shadow-lg border border-indigo-500/30";
 
@@ -122,10 +130,13 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
           <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('wavelength')}</label><Tip text={g('tipWavelength')} /></div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: getWavelengthColor(wavelength), boxShadow: `0 0 10px ${getWavelengthColor(wavelength)}` }} />
-            <span className="text-cyan-300 font-mono text-sm">{wavelength} nm</span>
+            <span className="text-cyan-300 font-mono text-sm">{drafts.wavelength} nm</span>
           </div>
         </div>
-        <input type="range" min={400} max={700} step={10} value={wavelength} onChange={(e) => up('wavelength', Number(e.target.value))}
+        <input type="range" min={400} max={700} step={10} value={drafts.wavelength}
+          onChange={(e) => setDraft('wavelength', Number(e.target.value))}
+          onPointerUp={() => commitDraft('wavelength')}
+          onKeyUp={() => commitDraft('wavelength')}
           className="w-full h-2 rounded-lg cursor-pointer accent-cyan-500" style={{ background: 'linear-gradient(to right, #8b5cf6, #3b82f6, #06b6d4, #22c55e, #eab308, #f97316, #ef4444)' }} />
       </div>
 
@@ -133,18 +144,26 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
       <div>
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('slitDistance')}</label><Tip text={g('tipSlitDist')} /></div>
-          <span className="text-cyan-300 font-mono text-sm">{slitDistance.toFixed(2)} mm</span>
+          <span className="text-cyan-300 font-mono text-sm">{drafts.slitDistance.toFixed(2)} mm</span>
         </div>
-        <input type="range" min={0.1} max={1.0} step={0.05} value={slitDistance} onChange={(e) => up('slitDistance', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-cyan-500" />
+        <input type="range" min={0.1} max={1.0} step={0.05} value={drafts.slitDistance}
+          onChange={(e) => setDraft('slitDistance', Number(e.target.value))}
+          onPointerUp={() => commitDraft('slitDistance')}
+          onKeyUp={() => commitDraft('slitDistance')}
+          className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-cyan-500" />
       </div>
 
       {/* Slit Width */}
       <div>
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('slitWidth')}</label><Tip text={g('tipSlitWidth')} /></div>
-          <span className="text-teal-300 font-mono text-sm">{slitWidth.toFixed(3)} mm</span>
+          <span className="text-teal-300 font-mono text-sm">{drafts.slitWidth.toFixed(3)} mm</span>
         </div>
-        <input type="range" min={0.01} max={0.2} step={0.005} value={slitWidth} onChange={(e) => up('slitWidth', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-teal-500" />
+        <input type="range" min={0.01} max={0.2} step={0.005} value={drafts.slitWidth}
+          onChange={(e) => setDraft('slitWidth', Number(e.target.value))}
+          onPointerUp={() => commitDraft('slitWidth')}
+          onKeyUp={() => commitDraft('slitWidth')}
+          className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-teal-500" />
         <div className="flex justify-between text-[10px] text-gray-500 mt-1"><span>{g('narrow')}</span><span>{g('wide')}</span></div>
       </div>
 
@@ -153,9 +172,13 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('barrierThickness')}</label><Tip text={g('tipBarrier')} /></div>
-            <span className="text-amber-300 font-mono text-sm">{(barrierThickness || 0.1).toFixed(2)} mm</span>
+            <span className="text-amber-300 font-mono text-sm">{drafts.barrierThickness.toFixed(2)} mm</span>
           </div>
-          <input type="range" min={0.02} max={0.5} step={0.02} value={barrierThickness || 0.1} onChange={(e) => up('barrierThickness', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-amber-500" />
+          <input type="range" min={0.02} max={0.5} step={0.02} value={drafts.barrierThickness}
+            onChange={(e) => setDraft('barrierThickness', Number(e.target.value))}
+            onPointerUp={() => commitDraft('barrierThickness')}
+            onKeyUp={() => commitDraft('barrierThickness')}
+            className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-amber-500" />
           <div className="flex justify-between text-[10px] text-gray-500 mt-1"><span>{g('thin')}</span><span>{g('thick')}</span></div>
         </div>
       )}
@@ -165,9 +188,13 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('transmission')}</label><Tip text={g('tipTransmission')} /></div>
-            <span className="text-rose-300 font-mono text-sm">{transmissionEfficiency}%</span>
+            <span className="text-rose-300 font-mono text-sm">{drafts.transmissionEfficiency}%</span>
           </div>
-          <input type="range" min={50} max={100} step={5} value={transmissionEfficiency} onChange={(e) => up('transmissionEfficiency', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-rose-500" />
+          <input type="range" min={50} max={100} step={5} value={drafts.transmissionEfficiency}
+            onChange={(e) => setDraft('transmissionEfficiency', Number(e.target.value))}
+            onPointerUp={() => commitDraft('transmissionEfficiency')}
+            onKeyUp={() => commitDraft('transmissionEfficiency')}
+            className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-rose-500" />
           <div className="flex justify-between text-[10px] text-gray-500 mt-1"><span>{g('lossy')}</span><span>{g('perfect')}</span></div>
         </div>
       )}
@@ -177,9 +204,13 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
         <div>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('coherence')}</label><Tip text={g('tipCoherence')} /></div>
-            <span className="text-purple-300 font-mono text-sm">{coherence}%</span>
+            <span className="text-purple-300 font-mono text-sm">{drafts.coherence}%</span>
           </div>
-          <input type="range" min={0} max={100} step={5} value={coherence} onChange={(e) => up('coherence', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-purple-500" />
+          <input type="range" min={0} max={100} step={5} value={drafts.coherence}
+            onChange={(e) => setDraft('coherence', Number(e.target.value))}
+            onPointerUp={() => commitDraft('coherence')}
+            onKeyUp={() => commitDraft('coherence')}
+            className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-purple-500" />
           <div className="flex justify-between text-[10px] text-gray-500 mt-1"><span>{g('incoh')}</span><span>{g('coh')}</span></div>
         </div>
       )}
@@ -188,9 +219,13 @@ export function ControlsPanel({ params, setParams, onReset, isLabMode = false }:
       <div>
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1"><label className="text-sm text-indigo-200">{g('intensity')}</label><Tip text={g('tipIntensity')} /></div>
-          <span className="text-yellow-300 font-mono text-sm">{intensity}</span>
+          <span className="text-yellow-300 font-mono text-sm">{drafts.intensity}</span>
         </div>
-        <input type="range" min={10} max={100} step={5} value={intensity} onChange={(e) => up('intensity', Number(e.target.value))} className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-yellow-500" />
+        <input type="range" min={10} max={100} step={5} value={drafts.intensity}
+          onChange={(e) => setDraft('intensity', Number(e.target.value))}
+          onPointerUp={() => commitDraft('intensity')}
+          onKeyUp={() => commitDraft('intensity')}
+          className="w-full h-2 bg-indigo-800 rounded-lg cursor-pointer accent-yellow-500" />
       </div>
 
       {/* Detector Button */}

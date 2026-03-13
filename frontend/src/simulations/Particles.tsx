@@ -389,15 +389,26 @@ export function Particles({
     });
   });
 
-  // Cleanup on unmount
+  // Cleanup on unmount: dispose per-particle materials
   useEffect(() => {
     return () => {
       particlesRef.current.forEach(p => {
         (p.mesh.material as THREE.Material).dispose();
         (p.glow.material as THREE.Material).dispose();
+        p.mesh.geometry.dispose();
+        p.glow.geometry.dispose();
       });
     };
   }, []);
+
+  // Dispose shared geometries (from useMemo) on unmount
+  useEffect(() => {
+    return () => {
+      geometries.particle.dispose();
+      geometries.glow.dispose();
+      geometries.ghost.dispose();
+    };
+  }, [geometries]);
 
   return <group ref={groupRef} />;
 }

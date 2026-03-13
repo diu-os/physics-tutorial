@@ -245,7 +245,7 @@ export function ScreenDisplayMode({
   heatmapOpacity,
   onOpacityChange,
 }: ScreenDisplayModeProps) {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const [showHelp, setShowHelp] = useState(false);
 
   const getLabel = (m: ScreenMode) => MODE_INFO[m].labels[language] || MODE_INFO[m].labels.en;

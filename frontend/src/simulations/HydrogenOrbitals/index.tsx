@@ -85,19 +85,19 @@ function OrbitalSurface({
   visible?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  
+
+  useFrame((_, delta) => {
+    if (groupRef.current && visible) {
+      groupRef.current.rotation.y += delta * 0.15;
+    }
+  });
+
   if (!visible) return null;
-  
+
   const scale = n * 1.5;
   const validL = Math.max(0, Math.min(l, n - 1));
   const orbitalType = ORBITAL_NAMES[validL] || 's';
   const colors = ORBITAL_COLORS[orbitalType as keyof typeof ORBITAL_COLORS] || ORBITAL_COLORS.s;
-
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.15;
-    }
-  });
 
   if (validL === 0) {
     return (

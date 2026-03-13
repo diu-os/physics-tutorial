@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import * as THREE from 'three';
 import { useWavelengthColor } from './hooks/useWavelengthColor';
 
 interface ScreenProps {

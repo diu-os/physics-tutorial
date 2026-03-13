@@ -411,7 +411,7 @@ function TunnelingControls({
   setParams: (p: TunnelingParams) => void;
   onReset: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t: _t } = useLanguage();
   
   return (
     <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-4">

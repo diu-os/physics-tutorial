@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Settings, RotateCcw, Camera, Download } from 'lucide-react';
 
 interface SimulationControlsProps {
@@ -23,6 +24,12 @@ function SimulationControls({
     setSlitSeparation(0.1);
     setObserverMode(false);
   };
+
+  const [draftWavelength, setDraftWavelength] = useState(wavelength);
+  const [draftSlitSeparation, setDraftSlitSeparation] = useState(slitSeparation);
+
+  useEffect(() => { setDraftWavelength(wavelength); }, [wavelength]);
+  useEffect(() => { setDraftSlitSeparation(slitSeparation); }, [slitSeparation]);
 
   // Get color based on wavelength for the indicator
   const getWavelengthColor = (wl: number): string => {
@@ -64,7 +71,7 @@ function SimulationControls({
                 className="w-4 h-4 rounded-full"
                 style={{ backgroundColor: getWavelengthColor(wavelength) }}
               />
-              <span className="text-sm text-gray-400">{wavelength} nm</span>
+              <span className="text-sm text-gray-400">{draftWavelength} nm</span>
             </div>
           </div>
           <input
@@ -72,8 +79,10 @@ function SimulationControls({
             min="400"
             max="700"
             step="10"
-            value={wavelength}
-            onChange={(e) => setWavelength(Number(e.target.value))}
+            value={draftWavelength}
+            onChange={(e) => setDraftWavelength(Number(e.target.value))}
+            onPointerUp={() => setWavelength(draftWavelength)}
+            onKeyUp={() => setWavelength(draftWavelength)}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -88,15 +97,17 @@ function SimulationControls({
             <label className="text-sm font-medium text-gray-300">
               Slit Separation
             </label>
-            <span className="text-sm text-gray-400">{slitSeparation.toFixed(2)} mm</span>
+            <span className="text-sm text-gray-400">{draftSlitSeparation.toFixed(2)} mm</span>
           </div>
           <input
             type="range"
             min="0.01"
             max="1"
             step="0.01"
-            value={slitSeparation}
-            onChange={(e) => setSlitSeparation(Number(e.target.value))}
+            value={draftSlitSeparation}
+            onChange={(e) => setDraftSlitSeparation(Number(e.target.value))}
+            onPointerUp={() => setSlitSeparation(draftSlitSeparation)}
+            onKeyUp={() => setSlitSeparation(draftSlitSeparation)}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">

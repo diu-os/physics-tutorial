@@ -1,7 +1,7 @@
 // components/LabTasks.tsx
 import { useMemo, useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
-import { Target, Trophy, ChevronDown, ChevronUp, Star, Lock, CheckCircle2 } from 'lucide-react';
+import { Target, Trophy, ChevronDown, ChevronUp, Star, CheckCircle2 } from 'lucide-react';
 import type { DoubleSlitStats, DoubleSlitParams } from '../simulations/DoubleSlit';
 import type { LogEntry } from './ExperimentLog';
 

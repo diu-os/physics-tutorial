@@ -209,22 +209,15 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
   );
 }
 
-export function StatsPanel({ stats, observerOn, mode }: StatsPanelProps) {
+export function StatsPanel({ stats, observerOn, mode: _mode }: StatsPanelProps) {
   const { language } = useLanguage();
-  
+
   const getText = (obj: Record<string, string>) => obj[language] || obj.en;
-  
-  // Handle null stats
-  if (!stats) {
-    return (
-      <div className="bg-slate-800/90 backdrop-blur rounded-xl p-3 border border-slate-700">
-        <h3 className="text-sm font-medium text-white mb-2">{getText(TEXTS.title)}</h3>
-        <p className="text-xs text-gray-400">{getText(TEXTS.loading)}</p>
-      </div>
-    );
-  }
-  
-  const { totalParticles, lostParticles = 0, fringeCount, contrast, histogram } = stats;
+
+  const histogram = stats?.histogram ?? [];
+  const totalParticles = stats?.totalParticles ?? 0;
+  const fringeCount = stats?.fringeCount ?? 0;
+  const contrast = stats?.contrast ?? 0;
 
   const histogramBars = useMemo(() => {
     const maxVal = Math.max(...histogram, 1);
@@ -235,49 +228,61 @@ export function StatsPanel({ stats, observerOn, mode }: StatsPanelProps) {
   }, [histogram]);
 
   const contrastPercent = Math.round(contrast * 100);
-  
+
   const patternQuality = useMemo(() => {
     if (totalParticles < 30) {
-      return { 
+      return {
         label: getText(TEXTS.patternQuality.waiting.label),
         description: getText(TEXTS.patternQuality.waiting.description),
-        color: 'text-indigo-400' 
+        color: 'text-indigo-400'
       };
     }
     if (totalParticles < 100) {
-      return { 
+      return {
         label: getText(TEXTS.patternQuality.collecting.label),
         description: getText(TEXTS.patternQuality.collecting.description),
-        color: 'text-yellow-400' 
+        color: 'text-yellow-400'
       };
     }
     if (observerOn) {
-      return { 
+      return {
         label: getText(TEXTS.patternQuality.classical.label),
         description: getText(TEXTS.patternQuality.classical.description),
-        color: 'text-orange-400' 
+        color: 'text-orange-400'
       };
     }
     if (fringeCount >= 5 && contrast > 0.5) {
-      return { 
+      return {
         label: getText(TEXTS.patternQuality.excellent.label),
         description: `${getText(TEXTS.patternQuality.excellent.description)}: ${fringeCount} @ ${contrastPercent}%`,
-        color: 'text-green-400' 
+        color: 'text-green-400'
       };
     }
     if (fringeCount >= 3 && contrast > 0.3) {
-      return { 
+      return {
         label: getText(TEXTS.patternQuality.good.label),
         description: getText(TEXTS.patternQuality.good.description),
-        color: 'text-cyan-400' 
+        color: 'text-cyan-400'
       };
     }
-    return { 
+    return {
       label: getText(TEXTS.patternQuality.forming.label),
       description: getText(TEXTS.patternQuality.forming.description),
-      color: 'text-blue-400' 
+      color: 'text-blue-400'
     };
   }, [totalParticles, fringeCount, contrast, observerOn, language, contrastPercent]);
+
+  // Handle null stats (after all hooks)
+  if (!stats) {
+    return (
+      <div className="bg-slate-800/90 backdrop-blur rounded-xl p-3 border border-slate-700">
+        <h3 className="text-sm font-medium text-white mb-2">{getText(TEXTS.title)}</h3>
+        <p className="text-xs text-gray-400">{getText(TEXTS.loading)}</p>
+      </div>
+    );
+  }
+
+  const { lostParticles = 0 } = stats;
 
   return (
     <div className="bg-indigo-900/60 backdrop-blur-md rounded-xl p-4 space-y-4 shadow-lg border border-indigo-500/30">

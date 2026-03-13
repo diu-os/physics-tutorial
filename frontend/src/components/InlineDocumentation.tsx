@@ -10,7 +10,7 @@
  * — Richard Feynman
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { HelpCircle, Info, BookOpen, ExternalLink, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 

@@ -24,7 +24,7 @@ export function LightBeam({
   y, 
   wavelength, 
   slitDistance,
-  intensity = 50 
+  intensity: _intensity = 50
 }: LightBeamProps) {
   const outerConeRef = useRef<THREE.Mesh>(null);
   const innerConeRef = useRef<THREE.Mesh>(null);

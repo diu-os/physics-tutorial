@@ -12,11 +12,10 @@
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { 
-  ChevronDown, 
-  ChevronRight, 
-  Download, 
-  Upload, 
-  RotateCcw, 
+  ChevronDown,
+  ChevronRight,
+  Download,
+  RotateCcw,
   Save,
   Beaker,
   Waves,
@@ -233,8 +232,8 @@ function SelectControl({ label, value, options, onChange }: SelectControlProps) 
   );
 }
 
-export function ResearchPanel({ params, onParamsChange, onExport, onImport }: ResearchPanelProps) {
-  const { t } = useLanguage();
+export function ResearchPanel({ params, onParamsChange, onExport, onImport: _onImport }: ResearchPanelProps) {
+  useLanguage();
   
   const updateSource = (key: keyof ResearchParams['source'], value: any) => {
     onParamsChange({

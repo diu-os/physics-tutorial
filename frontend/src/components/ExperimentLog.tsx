@@ -1,5 +1,5 @@
 // components/ExperimentLog.tsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { ScrollText, Plus, Trash2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import type { DoubleSlitStats, DoubleSlitParams } from '../simulations/DoubleSlit';
