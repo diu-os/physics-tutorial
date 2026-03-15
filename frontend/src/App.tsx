@@ -27,19 +27,11 @@ import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { ComingSoonModal, type AppMode } from './components/ModeSelector';
 import { ExperimentSelector, type ExperimentType, EXPERIMENTS } from './components/ExperimentSelector';
 import { ModeSelectorDropdown } from './components/ModeSelectorDropdown';
-import { TunnelingControls } from './components/TunnelingControls';
-import { HydrogenControls } from './components/HydrogenControls';
-import { ControlsPanel } from './components/ControlsPanel';
-import { ResearchPanel, DEFAULT_RESEARCH_PARAMS, type ResearchParams } from './components/ResearchPanel';
-import { StatsPanel } from './components/StatsPanel';
-import { TheorySection } from './components/TheorySection';
-import { QuizPanel } from './components/QuizPanel';
-import { LabTasks } from './components/LabTasks';
-import { DataExport } from './components/DataExport';
-import { ScreenDisplayMode, type ScreenMode } from './components/ScreenDisplayMode';
-import { TheoryComparisonOverlay } from './components/TheoryComparisonOverlay';
+import { ControlsSidebar } from './components/ControlsSidebar';
+import { StatsSidebar } from './components/StatsSidebar';
+import { DEFAULT_RESEARCH_PARAMS, type ResearchParams } from './components/ResearchPanel';
+import { type ScreenMode } from './components/ScreenDisplayMode';
 import { ModeInfoPanel } from './components/ModeInfoPanel';
-import { HeatmapSettings } from './components/HeatmapSettings';
 import { ScientificCredits, CreditsButton } from './components/ScientificCredits';
 import { FullscreenToggle, FullscreenOverlay, MinimalFullscreenControls } from './components/FullscreenToggle';
 
@@ -92,89 +84,7 @@ const DEFAULT_LAB_PARAMS: DoubleSlitParams = {
 
 // HydrogenControls → ./components/HydrogenControls
 
-// ============== TUNNELING STATS PANEL ==============
-function TunnelingStatsPanel({ stats }: { stats: TunnelingStats | null }) {
-  if (!stats) return null;
-  
-  return (
-    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
-      <h3 className="text-lg font-semibold text-purple-400">📊 Statistics</h3>
-      
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div className="bg-slate-900/50 p-2 rounded">
-          <div className="text-gray-400">Total</div>
-          <div className="text-xl font-bold text-white">{stats.totalParticles}</div>
-        </div>
-        <div className="bg-slate-900/50 p-2 rounded">
-          <div className="text-gray-400">Tunneled</div>
-          <div className="text-xl font-bold text-green-400">{stats.tunneled}</div>
-        </div>
-        <div className="bg-slate-900/50 p-2 rounded">
-          <div className="text-gray-400">Reflected</div>
-          <div className="text-xl font-bold text-red-400">{stats.reflected}</div>
-        </div>
-        <div className="bg-slate-900/50 p-2 rounded">
-          <div className="text-gray-400">T (exp)</div>
-          <div className="text-xl font-bold text-purple-400">
-            {(stats.experimentalProbability * 100).toFixed(1)}%
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-purple-900/30 p-2 rounded text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-400">T (theory):</span>
-          <span className="text-purple-300">{(stats.tunnelingProbability * 100).toFixed(1)}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============== HYDROGEN STATS PANEL ==============
-function HydrogenStatsPanel({ stats }: { stats: HydrogenStats | null }) {
-  if (!stats) return null;
-  
-  return (
-    <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
-      <h3 className="text-lg font-semibold text-orange-400">📊 Orbital Info</h3>
-      
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-400">Orbital:</span>
-          <span className="text-orange-400 font-bold">{stats.orbitalName}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Energy:</span>
-          <span className="text-white">{stats.energy.toFixed(2)} eV</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Angular momentum:</span>
-          <span className="text-white">{stats.angularMomentum.toFixed(2)} ℏ</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Avg radius:</span>
-          <span className="text-white">{stats.averageRadius.toFixed(1)} a₀</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Nodes:</span>
-          <span className="text-white">{stats.totalNodes} (r:{stats.radialNodes}, θ:{stats.angularNodes})</span>
-        </div>
-      </div>
-      
-      <div className="bg-orange-900/30 p-2 rounded text-sm">
-        <div className="text-gray-400 mb-1">Explored orbitals:</div>
-        <div className="flex flex-wrap gap-1">
-          {stats.viewedOrbitals.map(o => (
-            <span key={o} className="px-1.5 py-0.5 bg-orange-800/50 rounded text-orange-300 text-xs">
-              {o}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+// TunnelingStatsPanel, HydrogenStatsPanel → ./components/ExperimentStatsPanels
 
 // ============== MAIN APP CONTENT ==============
 function AppContent() {
@@ -376,76 +286,27 @@ function AppContent() {
       {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
         {/* Left Panel - Controls */}
+        {/* ControlsSidebar → ./components/ControlsSidebar */}
         {!isFullscreen && (
-        <aside className="flex-none w-80 p-3 overflow-y-auto space-y-3 bg-slate-900/50">
-          {/* Experiment-specific Controls */}
-          {currentExperiment === 'doubleSlit' && (
-            <>
-              {currentMode === 'research' ? (
-                <ResearchPanel
-                  params={researchParams}
-                  onParamsChange={setResearchParams}
-                  onExport={handleExport}
-                  onImport={setResearchParams}
-                />
-              ) : (
-                <ControlsPanel
-                  params={params}
-                  setParams={setParams}
-                  onReset={handleReset}
-                  isLabMode={currentMode === 'lab'}
-                />
-              )}
-              
-              {currentMode !== 'demo' && (
-                <ScreenDisplayMode
-                  mode={screenMode}
-                  onModeChange={setScreenMode}
-                  showHeatmap={params.showHeatmap ?? true}
-                  onHeatmapChange={(show) => setParams(p => ({ ...p, showHeatmap: show }))}
-                  heatmapOpacity={heatmapOpacity}
-                  onOpacityChange={setHeatmapOpacity}
-                />
-              )}
-              
-              {currentMode === 'research' && (
-                <HeatmapSettings
-                  opacity={heatmapOpacity}
-                  onOpacityChange={setHeatmapOpacity}
-                  colorScheme={researchParams.display.colorScheme as 'wavelength' | 'thermal' | 'grayscale' | 'scientific'}
-                  onColorSchemeChange={(scheme) => setResearchParams(p => ({
-                    ...p,
-                    display: { ...p.display, colorScheme: scheme }
-                  }))}
-                  showContours={false}
-                  onShowContoursChange={() => {}}
-                  interpolation="linear"
-                  onInterpolationChange={() => {}}
-                />
-              )}
-              
-              {currentMode === 'lab' && (
-                <LabTasks params={params} stats={stats} />
-              )}
-            </>
-          )}
-          
-          {currentExperiment === 'tunneling' && (
-            <TunnelingControls
-              params={tunnelingParams}
-              setParams={setTunnelingParams}
-              onReset={handleReset}
-            />
-          )}
-          
-          {currentExperiment === 'hydrogen' && (
-            <HydrogenControls
-              params={hydrogenParams}
-              setParams={setHydrogenParams}
-              onReset={handleReset}
-            />
-          )}
-        </aside>
+          <ControlsSidebar
+            currentExperiment={currentExperiment}
+            currentMode={currentMode}
+            params={params}
+            setParams={setParams}
+            researchParams={researchParams}
+            setResearchParams={setResearchParams}
+            tunnelingParams={tunnelingParams}
+            setTunnelingParams={setTunnelingParams}
+            hydrogenParams={hydrogenParams}
+            setHydrogenParams={setHydrogenParams}
+            onReset={handleReset}
+            onExport={handleExport}
+            screenMode={screenMode}
+            setScreenMode={setScreenMode}
+            heatmapOpacity={heatmapOpacity}
+            setHeatmapOpacity={setHeatmapOpacity}
+            stats={stats}
+          />
         )}
         
         {/* Center - 3D Canvas */}
@@ -572,105 +433,18 @@ function AppContent() {
         </div>
         
         {/* Right Panel - Stats & Theory */}
+        {/* StatsSidebar → ./components/StatsSidebar */}
         {!isFullscreen && (
-        <aside className="flex-none w-80 p-3 overflow-y-auto space-y-3 bg-slate-900/50">
-          {/* Experiment-specific Stats */}
-          {currentExperiment === 'doubleSlit' && (
-            <>
-              <StatsPanel
-                stats={stats}
-                observerOn={params.observerOn}
-                mode={currentMode}
-              />
-              
-              {currentMode === 'research' && stats && researchParams.display.showTheoryCurve && (
-                <TheoryComparisonOverlay
-                  histogram={stats.histogram}
-                  theoreticalCurve={stats.theoreticalCurve}
-                  wavelength={params.wavelength}
-                  slitDistance={params.slitDistance}
-                  slitWidth={params.slitWidth}
-                  coherence={params.coherence ?? 100}
-                  observerOn={params.observerOn}
-                  showTheory={true}
-                  showExperimental={true}
-                />
-              )}
-              
-              <TheorySection />
-              
-              {(currentMode === 'demo' || currentMode === 'lab') && (
-                <QuizPanel />
-              )}
-              
-              {(currentMode === 'lab' || currentMode === 'research') && stats && (
-                <DataExport
-                  stats={stats}
-                  params={params}
-                  onExport={handleExport}
-                />
-              )}
-            </>
-          )}
-          
-          {currentExperiment === 'tunneling' && (
-            <>
-              <TunnelingStatsPanel stats={tunnelingStats} />
-              
-              {/* Theory for Tunneling */}
-              <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
-                <h3 className="text-lg font-semibold text-purple-400">📖 Theory</h3>
-                <div className="text-sm text-gray-300 space-y-2">
-                  <p>
-                    <strong>WKB Approximation:</strong>
-                  </p>
-                  <div className="bg-slate-900/50 p-2 rounded font-mono text-xs">
-                    T ≈ exp(-2κL)
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    where κ = √(2m(V₀-E))/ℏ
-                  </p>
-                  <div className="pt-2 border-t border-slate-700">
-                    <div className="text-yellow-400 text-xs">
-                      🏆 Nobel Prize 2025
-                    </div>
-                    <div className="text-gray-400 text-xs">
-                      Clarke, Devoret, Martinis<br/>
-                      "Macroscopic Quantum Tunneling"
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-          
-          {currentExperiment === 'hydrogen' && (
-            <>
-              <HydrogenStatsPanel stats={hydrogenStats} />
-              
-              {/* Theory for Hydrogen */}
-              <div className="bg-slate-800/50 backdrop-blur rounded-xl p-4 space-y-3">
-                <h3 className="text-lg font-semibold text-orange-400">📖 Theory</h3>
-                <div className="text-sm text-gray-300 space-y-2">
-                  <p>
-                    <strong>Rydberg Formula:</strong>
-                  </p>
-                  <div className="bg-slate-900/50 p-2 rounded font-mono text-xs">
-                    E = -13.6 eV / n²
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Quantum numbers: n, l, m
-                  </p>
-                  <ul className="text-xs text-gray-400 list-disc list-inside">
-                    <li>n = 1,2,3... (principal)</li>
-                    <li>l = 0 to n-1 (angular)</li>
-                    <li>m = -l to +l (magnetic)</li>
-                  </ul>
-                </div>
-              </div>
-            </>
-          )}
-        </aside>
+          <StatsSidebar
+            currentExperiment={currentExperiment}
+            currentMode={currentMode}
+            params={params}
+            researchParams={researchParams}
+            stats={stats}
+            tunnelingStats={tunnelingStats}
+            hydrogenStats={hydrogenStats}
+            onExport={handleExport}
+          />
         )}
       </main>
       
